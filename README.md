@@ -19,6 +19,7 @@
 | **`.py` that calls `matplotlib`** | Runs in-browser via Pyodide (or fast `server.py` locally) — every `plt.figure()` appears as a gallery to pick and edit. |
 | **`.csv`** | Pick `X/Y` → **Line / Bar / Scatter / Area** — renders as editable SVG, move labels after. |
 | **Image `PNG/JPG/WebP`** | Drop as a layer, resize/rotate, **Trace to vector (beta)** via `imagetracerjs` → editable `<path>`s. |
+| **IEEE template** | Header **Template: IEEE Access single** → **Fix** enforces `3.45"`, `Times 8pt`, `tight_layout`, moves overlapping legend outside, min `0.5 pt` stroke. Agent: `figtweak.fix(fig, template="ieee-access-single")`. |
 
 **Editor:** Select (V), Text (T), Arrow (A), Rect (R), Line (L), Image (🖼) · **Shift+click** multi-select, **Ctrl+A** all, **Alt drag** moves all · **Align** left/center/right, top/middle/bottom, Distribute H/V · **Group** into `<g>` · **Bring front / Send back** · **Resize** via blue handles (`Shift` = uniform) · **Rotate** slider · **Fill / Stroke / Opacity / Font** · **Delete**, **Undo (Ctrl+Z)**, **arrow keys nudge** (`Shift` 10 px)
 
@@ -46,15 +47,27 @@ figtweak.save(fig, "fig.svg")  # keeps <text>, tags groups as data-mpl-type
 
 Then drag `fig.svg` onto `https://figify.vercel.app` (or local).
 
-#### 2. From a `.py` file
+#### 2. From a `.py` file — agent enforce (recommended)
+
+```python
+import figtweak
+fig, ax = plt.subplots(figsize=figtweak.ieee_single()) # 3.45×2.6"
+ax.plot(x, y, label="data")
+ax.legend()
+figtweak.fix(fig, template="ieee-access-single") # moves overlapping legend outside, tight_layout, Times 8pt
+figtweak.save(fig, "fig.svg", template="ieee-access-single") # enforces at SVG level too
+# lint before save:
+print(figtweak.lint(fig)) # [] if ok, else ["legend overlaps", "font 5.8pt <7pt"]
+```
 
 ```bash
 # CLI (no browser)
 python figtweak.py my_plot.py        # → my_plot.svg  (or _fig1.svg, _fig2.svg)
 python figtweak.py examples/plot_example.py
+python figtweak.py examples/ieee_demo.py  # shows bad vs good IEEE
 ```
 
-Or drag `my_plot.py` onto the canvas — runs in browser (Pyodide, ~12 MB first time, cached) or via `server.py` if you run it locally (2 s vs 10 s).
+Or drag `my_plot.py` onto the canvas — runs in browser (Pyodide, ~12 MB first time, cached) or via `server.py` if you run it locally (2 s vs 10 s). Pick **Template: IEEE Access single** in the header and click **Fix** to enforce (resize + Times + legend).
 
 #### 3. From CSV
 
@@ -133,12 +146,13 @@ Any static host works: upload `index.html` (+ `examples/` optional).
 
 ```
 figtweak/
-  index.html            # single-file app (~58 KB, no build)
-  figtweak.py           # save/dumps + render_py_code() + CLI
+  index.html            # single-file app (~70 KB, no build)
+  figtweak.py           # save/dumps + fix/lint/apply_template + render_py_code() + CLI
   server.py             # optional local static + /api/render-py (stdlib only)
   examples/
     demo.py             # → line.svg / bar.svg / scatter.svg + sample.csv
     plot_example.py     # multi-fig demo (drag me)
+    ieee_demo.py        # bad vs good IEEE (lint → fix → save)
     sample.csv
   vercel.json           # static
   .github/workflows/pages.yml

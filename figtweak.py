@@ -11,10 +11,137 @@ Usage:
 import io
 import xml.etree.ElementTree as ET
 
-# ponytail: keep helper <80 lines, no deps beyond stdlib+matplotlib
+# ponytail: keep helper small, no deps beyond stdlib+matplotlib
+TEMPLATES = {
+    "ieee-access-single": {"width": 3.45, "height": 2.6, "font": 8, "label": "IEEE Access single 3.5\""},
+    "ieee-access-double": {"width": 7.16, "height": 3.5, "font": 9, "label": "IEEE Access double 7.2\""},
+    "ieee-conf-single":  {"width": 3.5,  "height": 2.6, "font": 8, "label": "IEEE Conf single 3.5\""},
+    "ieee-conf-double":  {"width": 7.16, "height": 3.5, "font": 9, "label": "IEEE Conf double 7.2\""},
+    "generic-single":    {"width": 3.5,  "height": 2.6, "font": 8, "label": "Generic 3.5\""},
+    "generic-double":    {"width": 7.0,  "height": 3.5, "font": 8, "label": "Generic 7\""},
+}
+# ieee single is the enforce default — agent: fig, ax = plt.subplots(figsize=figtweak.ieee_single())
+def ieee_single(): return (TEMPLATES["ieee-access-single"]["width"], TEMPLATES["ieee-access-single"]["height"])
+def ieee_double(): return (TEMPLATES["ieee-access-double"]["width"], TEMPLATES["ieee-access-double"]["height"])
+
 SVG_NS = "http://www.w3.org/2000/svg"
 ET.register_namespace("", SVG_NS)
 ET.register_namespace("xlink", "http://www.w3.org/1999/xlink")
+
+def lint(fig):
+    """Return list of issues for overlapping/too-small figures."""
+    issues=[]
+    try:
+        w,h = fig.get_size_inches()
+        if w > 4.0 and w < 6.5:
+            # 6.4" default scaled to 3.5" -> fonts too small
+            issues.append(f"width {w:.1f}\" is default 6.4\", use ieee_single() 3.45\" for single column or fix() will scale down fonts to ~5.8pt")
+        # check tight_layout
+        # check legend overlap via renderer
+        try:
+            fig.canvas.draw()
+            renderer = fig.canvas.get_renderer()
+            for ax in fig.axes:
+                leg=ax.get_legend()
+                if leg:
+                    # legend bbox vs axes bbox
+                    try:
+                        lb=leg.get_window_extent(renderer)
+                        ab=ax.get_window_extent(renderer)
+                        # if legend inside axes and overlapping data area
+                        if ab.contains(lb.x0, lb.y0) or ab.contains(lb.x1, lb.y1):
+                            # check if legend covers >5% of axes
+                            inter_w=min(ab.x1, lb.x1)-max(ab.x0, lb.x0)
+                            inter_h=min(ab.y1, lb.y1)-max(ab.y0, lb.y0)
+                            if inter_w>0 and inter_h>0 and (inter_w*inter_h)/(ab.width*ab.height) > 0.05:
+                                issues.append("legend overlaps axes >5% — fix() will move legend outside")
+                    except: pass
+                # check font sizes after scaling to single column
+                # effective font size at 3.45" = current * 3.45/w
+                if w>0:
+                    eff = 10 * 3.45 / w  # default 10pt
+                    if eff < 7:
+                        issues.append(f"font ~{eff:.1f}pt when scaled to 3.45\" <7pt — fix() enforces 8pt Times")
+        except: pass
+    except: pass
+    return issues
+
+def fix(fig, template="ieee-access-single", enforce=True):
+    """Enforce IEEE template: resize, fonts, legend, tight_layout. Returns fig."""
+    tpl = TEMPLATES.get(template, TEMPLATES["ieee-access-single"])
+    # enforce figsize
+    if enforce:
+        fig.set_size_inches(tpl["width"], tpl["height"])
+        # fonts — IEEE requires Times
+        import matplotlib as mpl
+        mpl.rcParams["font.family"] = "serif"
+        mpl.rcParams["font.serif"] = ["Times New Roman", "Times", "DejaVu Serif"]
+        for ax in fig.axes:
+            ax.title.set_fontfamily("serif")
+            ax.title.set_fontsize(tpl["font"]+2)
+            ax.xaxis.label.set_fontsize(tpl["font"])
+            ax.yaxis.label.set_fontsize(tpl["font"])
+            for l in ax.get_xticklabels()+ax.get_yticklabels():
+                l.set_fontsize(tpl["font"]-1)
+                l.set_fontfamily("serif")
+            leg=ax.get_legend()
+            if leg:
+                for t in leg.get_texts():
+                    t.set_fontsize(tpl["font"]-1)
+                    t.set_fontfamily("serif")
+                # move overlapping legend outside
+                try:
+                    fig.canvas.draw()
+                    renderer=fig.canvas.get_renderer()
+                    ab=ax.get_window_extent(renderer)
+                    lb=leg.get_window_extent(renderer)
+                    if ab.contains(lb.x0, lb.y0) or ab.contains(lb.x1, lb.y1):
+                        leg.set_bbox_to_anchor((1.02, 1))
+                        leg.set_loc("upper left")
+                except: 
+                    # fallback: always move legend outside for ieee
+                    try: leg.set_bbox_to_anchor((1.02, 1)); leg.set_loc("upper left")
+                    except: pass
+        # tight layout — enforce, not warn
+        try: fig.tight_layout(pad=0.6)
+        except: 
+            try: fig.subplots_adjust(left=0.15, right=0.85, top=0.9, bottom=0.15)
+            except: pass
+    return fig
+
+def apply_template(svg_text, template="ieee-access-single"):
+    """Rewrite SVG width/font to IEEE template (enforce). Used by editor and fix()."""
+    tpl = TEMPLATES.get(template, TEMPLATES["ieee-access-single"])
+    try:
+        root=ET.fromstring(svg_text.encode("utf-8"))
+        # width/height in inches -> pt (1in=72pt) but SVG uses pt/px, keep as in
+        root.set("width", f"{tpl['width']}in")
+        root.set("height", f"{tpl['height']}in")
+        root.set("viewBox", f"0 0 {tpl['width']*72:.0f} {tpl['height']*72:.0f}")
+        # fonts: walk all <text>
+        for el in root.iter():
+            if el.tag.endswith("text") or el.tag==f"{{{SVG_NS}}}text":
+                # enforce Times, size
+                # tspan handling: set on text, tspans inherit
+                el.set("font-family", "Times New Roman, Times, serif")
+                # keep relative size but clamp to template font
+                try:
+                    cur=float(el.get("font-size","10").replace("px","").replace("pt",""))
+                    # cur is at original fig size; enforce to template font for labels, 9 for title
+                    # simple: set to tpl font for most, +2 for title-like (larger)
+                    is_title = cur > 11
+                    el.set("font-size", str(tpl["font"]+ (2 if is_title else 0)))
+                except: el.set("font-size", str(tpl["font"]))
+                # stroke-width for text? no
+            elif el.tag.endswith("path") or el.tag.endswith("line"):
+                # ensure minimum stroke 0.5pt
+                try:
+                    w=float(el.get("stroke-width","1").replace("pt",""))
+                    if w < 0.5: el.set("stroke-width", "0.5")
+                except: pass
+        return ET.tostring(root, encoding="unicode")
+    except:
+        return svg_text
 
 def _ensure_viewbox(root, width_pt, height_pt):
     if root.get("viewBox"):
@@ -56,8 +183,12 @@ def _tag_groups(root):
             pass
     return count
 
-def dumps(fig, **save_kwargs):
-    """Return editable SVG string from a matplotlib figure."""
+def dumps(fig, template=None, **save_kwargs):
+    """Return editable SVG string from a matplotlib figure. template='ieee-access-single' enforces."""
+    if template:
+        # enforce before savefig so fig size/fonts are correct
+        try: fix(fig, template=template)
+        except: pass
     buf = io.BytesIO()
     # force text as <text> not paths — critical for editing
     save_kwargs.setdefault("format", "svg")
@@ -83,13 +214,19 @@ def dumps(fig, **save_kwargs):
         root.set("data-fig-width", str(fig.get_size_inches()[0]))
         root.set("data-fig-height", str(fig.get_size_inches()[1]))
         root.set("data-fig-dpi", str(fig.dpi))
-        return ET.tostring(root, encoding="unicode")
+        if template:
+            root.set("data-template", template)
+        svg = ET.tostring(root, encoding="unicode")
+        if template:
+            # also enforce at SVG level (width/viewBox/fonts)
+            svg = apply_template(svg, template=template)
+        return svg
     except Exception:
         # fallback: return raw if parsing fails
         return raw
 
-def save(fig, path, **save_kwargs):
-    svg = dumps(fig, **save_kwargs)
+def save(fig, path, template=None, **save_kwargs):
+    svg = dumps(fig, template=template, **save_kwargs)
     with open(path, "w", encoding="utf-8") as f:
         f.write(svg)
     return path

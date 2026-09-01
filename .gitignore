@@ -9,6 +9,8 @@ __pycache__/
 # generated previews (keep line/bar/scatter as demos, ignore the rest)
 examples/plot_example_fig*.svg
 examples/demo.svg
+examples/ieee_*.svg
+ieee_*.svg
 
 # OS
 Thumbs.db
