@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "figify": {
+      "command": "python3",
+      "args": ["mcp_server.py"],
+      "cwd": ".",
+      "description": "Render and fix matplotlib figures (IEEE templates, lint, 300dpi). For opencode/claude — run from figify repo root."
+    }
+  }
+}

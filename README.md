@@ -142,12 +142,51 @@ Any static host works: upload `index.html` (+ `examples/` optional).
 
 ---
 
+### MCP for agents (so future figures are auto-fixed)
+
+You are the agent — use `mcp_server.py` so every figure you generate is `lint`ed and `fix`ed before save.
+
+**opencode / Claude config** (`mcp.json` or `~/.config/opencode/opencode.json`):
+
+```json
+{
+  "mcpServers": {
+    "figify": {
+      "command": "python3",
+      "args": ["/home/touhid/figtweak/mcp_server.py"]
+    }
+  }
+}
+```
+
+Tools:
+
+| Tool | What it does |
+|------|--------------|
+| `list_templates` | `ieee-access-single` (3.45") etc. |
+| `render_py(code, filename)` | `exec` your `matplotlib` code → `{svgs, logs, error}` (uses `figtweak.render_py_code`) |
+| `lint_py(code)` | `figtweak.lint` on each fig → `["legend overlaps", "font 5.8pt <7pt"]` |
+| `fix_py(code, template="ieee-access-single")` | `figtweak.fix` + `dumps(template)` → `{svgs}` already 3.45" Times 8pt, legend outside |
+| `apply_template(svg, template)` | Rewrite existing SVG `width` + `//text/@font-family` |
+| `save_svg(svg, path)` | Write to disk |
+
+Agent prompt:
+
+```
+After you write matplotlib code, call figify.lint_py — if issues, call figify.fix_py with template="ieee-access-single" and use the returned SVG.
+Or in Python: import figtweak; figtweak.fix(fig); figtweak.save(fig, "fig.svg", template="ieee-access-single")
+```
+
+Run: `python mcp_server.py` (stdio) — thin wrapper over `figtweak.py`, no new engine.
+
 ### Files
 
 ```
 figtweak/
   index.html            # single-file app (~70 KB, no build)
   figtweak.py           # save/dumps + fix/lint/apply_template + render_py_code() + CLI
+  mcp_server.py         # MCP wrapper (FastMCP) — 5 tools above
+  mcp.json              # example config for opencode/claude
   server.py             # optional local static + /api/render-py (stdlib only)
   examples/
     demo.py             # → line.svg / bar.svg / scatter.svg + sample.csv
