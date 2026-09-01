@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+/tmp/
+.figtweak.json
+*.figtweak.json
+
+# generated previews (keep line/bar/scatter as demos, ignore the rest)
+examples/plot_example_fig*.svg
+examples/demo.svg
+
+# OS
+Thumbs.db
+.venv/
+venv/
