@@ -2,12 +2,8 @@
 
 > Drag a `.py` or `.svg` → move legends, nudge labels, add arrows, compose with images, export at 300 dpi. No Illustrator, no re-running Python to move text 2 px.
 
-**Live demo:** `https://figify.vercel.app` (static, Pyodide fallback) — or `python server.py` → `http://localhost:8765`
+**Live demo:** `https://touhidsiddiqueeraj-bit.github.io/figify/` (static, Pyodide fallback) — or `python server.py` → `http://localhost:8765`
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/touhidsiddiqueeraj-bit/figify)
-[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-deployed-0a0)](https://touhidsiddiqueeraj-bit.github.io/figify/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![No build](https://img.shields.io/badge/no%20build-single%20HTML-blue)](#)
 
 ---
 
